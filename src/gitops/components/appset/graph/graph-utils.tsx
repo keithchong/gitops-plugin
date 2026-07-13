@@ -8,7 +8,7 @@ import {
   NODE_DIAMETER,
 } from '@gitops/components/graph/utils';
 import { ApplicationKind, ApplicationModel } from '@gitops/models/ApplicationModel';
-import { ApplicationSetKind, ApplicationStatusContent } from '@gitops/models/ApplicationSetModel';
+import { ApplicationSetKind, ApplicationSetModel, ApplicationStatusContent } from '@gitops/models/ApplicationSetModel';
 import { t } from '@gitops/utils/hooks/useGitOpsTranslation';
 import { resourcePathFromModel } from '@gitops/utils/utils';
 import { K8sModel } from '@openshift-console/dynamic-plugin-sdk';
@@ -54,6 +54,8 @@ const createApplicationSetNode = (
       name: applicationSet?.metadata?.name,
       kind: applicationSet?.kind,
       resourceNodeLayout: resourceNodeLayout,
+      version: ApplicationSetModel.apiVersion || 'v1alpha1',
+      group: ApplicationSetModel.apiGroup || 'argoproj.io',
       badge: 'AS',
       badgeColor: RESOURCE_COLORS.get(
         RESOURCE_BADGE_COLORS.get('.co-m-resource-' + applicationSet?.kind.toLowerCase()),
@@ -226,6 +228,12 @@ export const getInitialNodes = (
     const sortedSteps = Array.from(stepGroupAppsMap.keys()).sort();
     sortedSteps.forEach((step) => {
       const stepGroupApps = stepGroupAppsMap.get(step);
+
+      const key = applicationSet.spec?.strategy?.rollingSync?.steps[parseInt(step) - 1]?.matchExpressions.at(0)?.key;
+      const operator = applicationSet.spec?.strategy?.rollingSync?.steps[parseInt(step) - 1]?.matchExpressions.at(0)?.operator;
+      const values = applicationSet.spec?.strategy?.rollingSync?.steps[parseInt(step) - 1]?.matchExpressions.at(0)?.values.join(', ');
+      
+
       if (stepGroupApps.length === 0 && hasApplicationStatus) {
         stepGroupAppsMap.set(step.toString(), [step + '-filler-node']);
         initialNodes.push({
@@ -269,10 +277,11 @@ export const getInitialNodes = (
         type: 'step-group',
         group: true,
         rank: 3,
-        label: 'Progressive Sync Step ' + step,
+        label: key + ' ' + operator + ' ' + values,
         children: [...stepGroupApps],
         data: {
           step: step,
+          matchExpression: key + ' ' + operator + ' ' + values,
           groupHealthy: healthyCount === appsWithStepCount,
           appCount: appsWithStepCount,
           healthyCount: healthyCount,

@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
     "module": "esnext",
     "moduleResolution": "node",
     "target": "es2021",
@@ -11,11 +10,13 @@
     "noUnusedLocals": true,
     "lib": ["dom", "es2017"],
     "paths": {
-      "@gitops/*": ["src/gitops/*"],
-      "@gitops-models/*": ["src/gitops/models/*"],
-      "@gitops-services/*": ["src/gitops/services/*"],
-      "@images/*": ["src/images/*"],
-      "@gitops-shared/*": ["src/gitops/components/shared/*"]
+      "@gitops/*": ["./src/gitops/*"],
+      "@gitops-models/*": ["./src/gitops/models/*"],
+      "@gitops-services/*": ["./src/gitops/services/*"],
+      "@gitops-application/*": ["./src/gitops/components/application/*"],
+      "@gitops-appset/*": ["./src/gitops/components/appset/*"],
+      "@images/*": ["./src/images/*"],
+      "@gitops-shared/*": ["./src/gitops/components/shared/*"]
     }
   },
   "include": ["src"]

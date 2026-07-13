@@ -18,7 +18,7 @@ interface HealthProps {
   message?: string;
 }
 
-const HealthStatus: React.FC<HealthProps> = ({ status, message }) => {
+export const HealthStatus: React.FC<HealthProps> = ({ status, message }) => {
   let targetIcon: React.ReactNode;
   switch (status) {
     case HS.HEALTHY:

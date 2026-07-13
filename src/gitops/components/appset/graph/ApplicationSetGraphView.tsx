@@ -5,10 +5,13 @@ import { observer } from 'mobx-react';
 import { ApplicationKind, ApplicationModel } from '@gitops/models/ApplicationModel';
 import { ApplicationSetKind, applicationSetModelRef } from '@gitops/models/ApplicationSetModel';
 import { HealthStatus } from '@gitops/utils/constants';
+import * as HealthStatusComponent from '@gitops/Statuses/HealthStatus';
 import { ArgoServer, getArgoServer } from '@gitops/utils/gitops';
 import { t } from '@gitops/utils/hooks/useGitOpsTranslation';
 import {
+  HorizontalNav,
   K8sModel,
+  ResourceLink,
   useAnnotationsModal,
   useDeleteModal,
   useK8sModel,
@@ -60,6 +63,7 @@ import {
   withContextMenu,
   withPanZoom,
   withSelection,
+  TopologySideBar,
 } from '@patternfly/react-topology';
 
 import { GraphResourceMenuItem } from '../../application/graph/hooks/GraphResourceMenuItems';
@@ -70,6 +74,9 @@ import { StepGroupComponent } from './nodes/StepGroupComponent';
 import { getInitialEdges, getInitialNodes } from './graph-utils';
 
 import '../../application/graph/ApplicationGraphView.scss';
+import AppSetMatchExpressionsTab from '../AppSetMatchExpressionsTab';
+import { DescriptionList, DescriptionListDescription, DescriptionListGroup, DescriptionListTermHelpText, DescriptionListTermHelpTextButton, Flex, FlexItem, PageSection, Popover, Title } from '@patternfly/react-core';
+import { getAppSetHealthStatus } from './AppSetUtils';
 
 const customLayoutFactory: (isOwnerRefView: boolean) => LayoutFactory =
   (isOwnerRefView: boolean) =>
@@ -143,6 +150,7 @@ interface AppSetContextMenuItemProps {
   launchAnnotationsModal: () => void;
   launchDeleteModal: () => void;
   navigate: NavigateFunction;
+  setShowMatchExpressions: (show: boolean) => void;
 }
 
 const getArgoHref = (argoServer: ArgoServer, namespace: string, name: string): string => {
@@ -161,6 +169,7 @@ const AppSetContextMenuItem: React.FC<AppSetContextMenuItemProps> = ({
   launchAnnotationsModal,
   launchDeleteModal,
   navigate,
+  setShowMatchExpressions,
 }) => {
   if (label === '-') {
     return <ContextMenuSeparator component="li" key={`separator:${index}`} />;
@@ -195,6 +204,9 @@ const AppSetContextMenuItem: React.FC<AppSetContextMenuItemProps> = ({
         }
         break;
       }
+      case t('Show all match expressions'):
+        setShowMatchExpressions(true);
+        break;
       case t('Edit labels'):
         launchLabelsModal();
         break;
@@ -231,6 +243,7 @@ interface ContextMenuFactoryParams {
   launchAnnotationsModal: () => void;
   launchDeleteModal: () => void;
   navigate: NavigateFunction;
+  setShowMatchExpressions: (show: boolean) => void;
 }
 
 const createContextMenuItems = (
@@ -282,7 +295,13 @@ const createAppSetComponentFactory =
       case 'group':
         return TransparentGroup;
       case 'step-group':
-        return withSelection()(StepGroupComponent);
+        return withContextMenu((graphElement) =>
+          createContextMenuItems(
+            graphElement,
+            paramsRef,
+            t('Show all match expressions'),
+          ),
+        )(withSelection()(StepGroupComponent));
       case 'filler-node':
         return DefaultNode;
       case 'task-edge':
@@ -324,6 +343,137 @@ export const TreeViewLayout = {
   PROGRESSIVE_SYNC_FLOW_LAYOUT: 'progressive-sync-flow-layout',
 };
 
+type TopologySideBarParams = {
+  show: boolean;
+  onClose: () => void;
+  selectedIds: string[];
+  controller: Visualization;
+  applicationSet: ApplicationSetKind;
+};
+
+const getTopologySideBar = ({
+  show,
+  onClose,
+  selectedIds,
+  controller,
+  applicationSet,
+}: TopologySideBarParams): React.ReactElement => {
+  const selectedNode =
+    selectedIds.length > 0
+      ? (controller.getNodeById(selectedIds[0]) as TopologyNode | undefined)
+      : undefined;
+      
+  // const appSetStatus = getAppSetStatus(applicationSet);
+  const appSetHealthStatus = getAppSetHealthStatus(applicationSet);
+
+  // if (!selectedNode?.getId().endsWith('-step-group')) {
+  //   return null;
+  // }
+  const isStepGroup = selectedNode?.getId().endsWith('-step-group');
+  
+  // const key = applicationSet.spec?.strategy?.rollingSync?.steps[parseInt(step) - 1]?.matchExpressions.at(0)?.key;
+  // const operator = applicationSet.spec?.strategy?.rollingSync?.steps[parseInt(step) - 1]?.matchExpressions.at(0)?.operator;
+  // const values = applicationSet.spec?.strategy?.rollingSync?.steps[parseInt(step) - 1]?.matchExpressions.at(0)?.values.join(', ');
+  // const yaml = applicationSet.spec?.strategy?.rollingSync?.steps[parseInt(selectedNode?.getData().step) - 1]?.matchExpressions || {};
+  const pages = React.useMemo(
+    () => [
+      {
+        href: '',
+        name: t('Match Expressions'),
+        component: AppSetMatchExpressionsTab,
+      }
+    ], [t]);
+  return (
+    <TopologySideBar className="topology-example-sidebar" show={show} onClose={onClose}>
+      {/* <DescriptionListGroup>
+        <DescriptionListTermHelpText>{selectedNode?.getLabel() ?? selectedIds[0]}</DescriptionListTermHelpText>
+        </DescriptionListGroup> */}
+      <div style={{ marginTop: 27, marginLeft: 20, height: '800px' }}>
+      {selectedNode == undefined ? (
+        <div></div>
+       ) : (
+        !isStepGroup && selectedNode !== undefined ? (
+          <div>
+            <PageSection>
+              <Title headingLevel="h2" className="co-section-heading">
+              {selectedNode?.getLabel() ?? selectedIds[0]}
+              </Title>
+              <Flex
+                justifyContent={{ default: 'justifyContentSpaceEvenly' }}
+                direction={{ default: 'column', lg: 'row' }}
+              >
+                <Flex flex={{ default: 'flex_2' }}>
+                  <FlexItem fullWidth={{ default: 'fullWidth' }}>
+                      {/* <div className="ocs-sidebar-tabsection">
+                        {selectedNode?.getData().name}
+                      </div> */}
+                      <DescriptionList className="pf-c-description-list">
+                        <DescriptionListGroup className="pf-c-description-list__group">
+                          <DescriptionListTermHelpText className="pf-c-description-list__term">
+                            <Popover
+                              headerContent={<div>{t('Name')}</div>}
+                              bodyContent={<div>{t('Name must be unique within a namespace.')}</div>}
+                            >
+                              <DescriptionListTermHelpTextButton>{t('Name')}</DescriptionListTermHelpTextButton>
+                            </Popover>
+                          </DescriptionListTermHelpText>
+                          <DescriptionListDescription>
+                            <Flex alignItems={{ default: 'alignItemsCenter' }}>
+                            <ResourceLink
+                              groupVersionKind={{
+                                
+                                  kind: selectedNode?.getData().kind, 
+                                  version: selectedNode?.getData().version,
+                                group: selectedNode?.getData().group,
+                              }}
+                              name={selectedNode?.getData().name}
+                              namespace={selectedNode?.getData().namespace}
+                              inline={true}
+                            >
+                              {/* <span className="pf-u-pl-sm"> */}
+                              {/* {' '}{selectedNode?.getData().name}{' '}{selectedNode?.getData().namespace} */}
+                              {/* </span> */}
+                            </ResourceLink>
+
+                              {/* <FlexItem>{selectedNode?.getData().name}</FlexItem> */}
+                              <FlexItem>
+                                <HealthStatusComponent.HealthStatus status={appSetHealthStatus} />
+                              </FlexItem>
+                            </Flex>
+                          </DescriptionListDescription>
+                        </DescriptionListGroup>
+                      </DescriptionList>
+
+                  </FlexItem>
+                </Flex>
+              </Flex>
+            </PageSection>
+          </div>
+        ) : (
+          <div>
+            <HorizontalNav pages={pages} resource={applicationSet} customData={{ step: selectedNode?.getData().step }} />
+            {/* <div className="ocs-sidebar-tabsection">
+              <div className="co-m-pane__heading-owner">
+                <SidebarSectionHeading text={'Progressive Sync Step ' +selectedNode?.getData().step} />
+              </div>
+            </div> */}
+            {/* <div className="overview__sidebar-pane-body resource-overview__body">
+              <div className="resource-overview__summary">
+                <pre>{YamlP.stringify(yaml, null, 2)}</pre>
+
+                <DescriptionList>
+                  <DetailsItem label={t('plugin__gitops-public~Step')} obj={applicationSet} path={'spec.strategy.rollingSync.steps[' + selectedNode?.getData().step + '].matchExpressions[0].key'} />
+                </DescriptionList>
+              </div>
+            </div> */}
+          </div>
+        ))
+        }
+      </div>
+    </TopologySideBar>
+  );
+};
+
 export const ApplicationSetGraphView: React.FC<{
   applicationSet: ApplicationSetKind;
   applications: ApplicationKind[];
@@ -352,6 +502,7 @@ export const ApplicationSetGraphView: React.FC<{
   // Track expanded step-groups - only expanded step-groups have their app nodes included in initialNodes
   const [expandedStepGroups, setExpandedStepGroups] = React.useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
+  const [showMatchExpressions, setShowMatchExpressions] = React.useState(false);
   const [renderKey, setRenderKey] = React.useState(0);
   // Track if initial collapse is pending - hide graph until complete to avoid flicker
   const skipExpandGroupsEffectRef = React.useRef(false);
@@ -375,6 +526,7 @@ export const ApplicationSetGraphView: React.FC<{
     launchAnnotationsModal,
     launchDeleteModal,
     navigate,
+    setShowMatchExpressions,
   });
 
   React.useEffect(() => {
@@ -386,6 +538,7 @@ export const ApplicationSetGraphView: React.FC<{
       launchAnnotationsModal,
       launchDeleteModal,
       navigate,
+      setShowMatchExpressions,
     };
   }, [
     model,
@@ -395,6 +548,7 @@ export const ApplicationSetGraphView: React.FC<{
     launchAnnotationsModal,
     launchDeleteModal,
     navigate,
+    setShowMatchExpressions,
   ]);
 
   const initialNodes = getInitialNodes(
@@ -794,10 +948,18 @@ export const ApplicationSetGraphView: React.FC<{
       });
     }
   }, [controller, structuralNodes, initialNodes, treeViewLayout, expandedStepGroups, expandGroups]);
+
   return (
     <TopologyView
       className="gitops-topology-view"
       // style={{ opacity: graphReady ? 1 : 1 }}
+      sideBar={getTopologySideBar({
+        show: showMatchExpressions,
+        onClose: () => setShowMatchExpressions(false),
+        selectedIds,
+        controller,
+        applicationSet,
+      })}
       controlBar={
         <TopologyControlBar
           controlButtons={createTopologyControlButtons({

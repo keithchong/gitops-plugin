@@ -23,6 +23,7 @@ import {
   ShapeProps,
   useAnchor,
   WithSelectionProps,
+  WithContextMenuProps,
 } from '@patternfly/react-topology';
 import styles from '@patternfly/react-topology/dist/esm/css/topology-components';
 
@@ -263,10 +264,10 @@ const DummyShape: React.FunctionComponent<RectangleProps> = ({
     </g>
   );
 };
-
+//CustomNodeProps & WithSelectionProps & WithContextMenuProps
 // This is the collapsible group of applications that have the same step, determined by the matched expression defined in the ApplicationSet
-export const StepGroupComponent: React.FC<WithSelectionProps & { element: TopologyNode }> =
-  observer(({ element, onSelect, selected }) => {
+export const StepGroupComponent: React.FC<WithContextMenuProps & WithSelectionProps & { element: TopologyNode }> =
+  observer(({ element, onContextMenu, contextMenuOpen, onSelect, selected }) => {
     useAnchor(RightAnchor, AnchorEnd.source, 'task-edge');
     useAnchor(LeftAnchor, AnchorEnd.target, 'task-edge');
 
@@ -288,6 +289,16 @@ export const StepGroupComponent: React.FC<WithSelectionProps & { element: Topolo
       }
     }, []);
 
+    const handleContextMenu = React.useCallback(
+      (e: React.MouseEvent) => {
+        if (!selected) {
+          onSelect?.(e);
+        }
+        onContextMenu?.(e);
+      },
+      [onSelect, onContextMenu, selected],
+    );
+
     return (
       <DefaultGroup
         element={element}
@@ -297,6 +308,9 @@ export const StepGroupComponent: React.FC<WithSelectionProps & { element: Topolo
         hulledOutline={true}
         showLabelOnHover={false}
         showLabel={true}
+        // secondaryLabel={element.getData().matchExpression}
+        truncateLength={20}
+        hideContextMenuKebab={false}
         labelPosition={LabelPosition.top}
         badgeLocation={BadgeLocation.inner}
         badgeColor="var(--pf-t--global--background--color--floating--default)"
@@ -304,13 +318,15 @@ export const StepGroupComponent: React.FC<WithSelectionProps & { element: Topolo
           RESOURCE_BADGE_COLORS.get('.co-m-resource-application'),
         )}
         badgeTextColor="var(--pf-t--global--text--color--regular)"
-        badge={element.getData().step}
+        badge={'Step ' +element.getData().step}
         collapsedShadowOffset={0}
         collapsedWidth={300}
         collapsedHeight={50}
         getCollapsedShape={() => DummyShape}
         labelClassName={css('gitops-step-group-label', selected && 'pf-m-selected')}
         onCollapseChange={handleCollapseChange}
+        onContextMenu={handleContextMenu}
+        contextMenuOpen={contextMenuOpen}
         onSelect={onSelect}
         selected={selected}
       >
